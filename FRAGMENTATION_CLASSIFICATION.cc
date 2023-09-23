@@ -73,6 +73,7 @@ public:
             }
             
             else if (v_stat == frag_status){
+                // Testing testing
                 for(auto & p : vertex -> particles_in()){
                     double deta = Particle(p).eta() - Zeta;  // Difference in pseudorapidity.
                     double dphi = Particle(p).phi() - Zphi;  // Difference in azimuthal angles.
