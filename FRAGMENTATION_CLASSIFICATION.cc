@@ -34,7 +34,7 @@ public:
     // whether or not they are children to the outgoing particles of the signal process.
     // -----------------------------------------------------------------------------------------------------------------
     void classify_particles(const Event& event, ofstream& outfile, double area,
-                             double Zphi, double Zeta, double Zpt, double Zthe, int h_length) {
+                             double Zphi, double Zeta, double Zpt) {
         int sign_status = 1;  // Signal process vertex has status = 1.
         int hcol_status = 2;  // Hard collision vertices have status = 2.
         int frag_status = 5;  // Fragmentation vertex has status = 5.
@@ -42,13 +42,11 @@ public:
         
         std::vector<int> taken_ids;  // store ids of the children to the outgoing particles of the signal vertex.
         
-        std::vector<float> deta_values, dphi_values, dthe_values;
+        std::vector<float> deta_values, dphi_values;
         std::vector<int> signals;
         
         double pTsumTow(0.0), pTsumTrans(0.0), pTsumAway(0.0), pTsum(0.0);
         double pTsumTransmin(0.0), pTsumTransmax(0.0), pTsumLeft(0.0), pTsumRight(0.0);
-        
-        ///@todo: Implement cutting Cuts::pT > 0.5*GeV && Cuts::abseta <2.5 && pcut
         
         for(auto & vertex : (*event.genEvent()).vertices()){
             int v_stat = vertex -> status();
@@ -73,12 +71,23 @@ public:
             }
             
             else if (v_stat == frag_status){
-                // Testing testing
-                for(auto & p : vertex -> particles_in()){
-                    double deta = Particle(p).eta() - Zeta;  // Difference in pseudorapidity.
-                    double dphi = Particle(p).phi() - Zphi;  // Difference in azimuthal angles.
-                    double dthe = Particle(p).theta() - Zthe;  // Difference in polar angles.
-                    double pT = Particle(p).momentum().pT();  // Transverse momentum.
+                for(auto & prtcl : vertex -> particles_in()){
+                    
+                    Particle p = Particle(prtcl);  // Extract particle as a Rivet Particle object.
+                    double pT = p.momentum().pT();  // Transverse momentum.
+                    double pabspid = p.abspid();  // Particle ID for cutting condition.
+                    
+                    // Apply cutting on particles. Same as the condition applied for final state particles.
+                    if(pT < 0.5*GeV ||
+                       p.abseta() > 2.5 ||
+                       pabspid == PID::SIGMAMINUS ||
+                       pabspid == PID::SIGMAPLUS ||
+                       pabspid == PID::XIMINUS ||
+                       pabspid == PID::OMEGAMINUS
+                       ) continue;
+                    
+                    double deta = p.eta() - Zeta;  // Difference in pseudorapidity.
+                    double dphi = p.phi() - Zphi;  // Difference in azimuthal angles.
                     
                     pTsum += pT;
                     
@@ -98,14 +107,13 @@ public:
                     // Away region
                     else pTsumAway += pT;
 
+                    // Check if particle comes from the signal process vertex.
                     bool signal = false;
-                    // If true, particle comes from the signal process.
-                    if(std::find(taken_ids.begin(), taken_ids.end(), p -> id()) != taken_ids.end()) signal=true;
+                    if(std::find(taken_ids.begin(), taken_ids.end(), prtcl -> id()) != taken_ids.end()) signal=true;
                     
                     // Store the values for writing them afterwards.
                     deta_values.push_back(deta);
                     dphi_values.push_back(dphi);
-                    dthe_values.push_back(dthe);
                     signals.push_back(signal);
                     
                 }
@@ -129,26 +137,26 @@ public:
         }
         
         for (int i = 0; i < deta_values.size() - 1; i++){
-            outfile << std::setprecision(4) << std::fixed;
-            outfile << std::setw(8) << deta_values[i] << "\t";
-            outfile << std::setw(8) << dphi_values[i] << "\t";
-            outfile << std::setw(8) << dthe_values[i] << "\t";
+            outfile << std::setprecision(4);
+            outfile << std::setw(8) << std::fixed << deta_values[i] << "\t";
+            outfile << std::setw(8) << std::fixed << dphi_values[i] << "\t";
             
             if(i != 0){
-                outfile << std::setw(7) << signals[i] << "\n";
+                outfile << std::fixed << std::setw(7) << signals[i] << "\n";
                 continue;
             }
             
-            outfile << std::setw(7) << signals[i] << "\t";
-            outfile << std::setw(8) << Zpt << "\t";
-            outfile << std::setw(8) << hcol_counter << "\t";
-            outfile << std::setw(8) << pTsum << "\t";
-            outfile << std::setw(8) << pTsumTow << "\t";
-            outfile << std::setw(10) << pTsumTrans << "\t";
-            outfile << std::setw(9) << pTsumAway << "\t";
-            outfile << std::setw(13) << pTsumTransmin << "\t";
-            outfile << std::setw(13) << pTsumTransmax << "\t";
-            outfile << std::setw(9) << area << "\t";
+            outfile << std::setw(7) << std::fixed << signals[i] << "\t";
+            outfile << std::setw(9) << std::fixed << Zpt << "\t";
+            outfile << std::setw(8) << std::fixed << Zeta << "\t";
+            outfile << std::setw(8) << std::fixed << hcol_counter << "\t";
+            outfile << std::setw(8) << std::fixed << pTsum << "\t";
+            outfile << std::setw(8) << std::fixed << pTsumTow << "\t";
+            outfile << std::setw(10) << std::fixed << pTsumTrans << "\t";
+            outfile << std::setw(9) << std::fixed << pTsumAway << "\t";
+            outfile << std::setw(13) << std::fixed << pTsumTransmin << "\t";
+            outfile << std::setw(13) << std::fixed << pTsumTransmax << "\t";
+            outfile << std::setw(9) << std::fixed << area << "\t";
             
             analyze_final_state(event, outfile, area, Zphi, Zpt);
 //            outfile << std::setw(9) << to_string(area) << '\n';
@@ -204,12 +212,12 @@ public:
             pTsumTransmin = pTsumLeft;
         }
         
-        outfile << std::setprecision(4) << std::fixed;
-        outfile << std::setw(10) << pTsumTow/area << "\t";
-        outfile << std::setw(12) << pTsumTrans/area << "\t";
-        outfile << std::setw(11) << pTsumAway/area << "\t";
-        outfile << std::setw(15) << pTsumTransmin/(0.5*area) << "\t";
-        outfile << std::setw(15) << pTsumTransmax/(0.5*area) << '\n';
+//        outfile << std::setprecision(4);
+        outfile << std::setw(10) << std::fixed << pTsumTow/area << "\t";
+        outfile << std::setw(12) << std::fixed << pTsumTrans/area << "\t";
+        outfile << std::setw(11) << std::fixed << pTsumAway/area << "\t";
+        outfile << std::setw(15) << std::fixed << pTsumTransmin/(0.5*area) << "\t";
+        outfile << std::setw(15) << std::fixed << pTsumTransmax/(0.5*area) << '\n';
         
     }
     // -----------------------------------------------------------------------------------------------------------------
@@ -300,9 +308,6 @@ public:
         double  Zpt   = zfinder.bosons()[0].momentum().pT()/GeV;
         double  Zphi  = zfinder.bosons()[0].momentum().phi();
         double  Zeta  = zfinder.bosons()[0].momentum().eta();
-        double  Zthe  = zfinder.bosons()[0].momentum().theta();
-        
-        ///@todo: Implement a function that creates statistics such that one can extract representatives from the sample.
         
         // -----------------------------------------------------------------------------------------------------------------
         // Determine Zpt region.
@@ -340,28 +345,26 @@ public:
         ofstream particle_file (path+"/particles_"+to_string(counter)+".csv");  // Open file;
         
         // Header of the file
-        particle_file << std::setw(8) << "dEta" << "\t";
-        particle_file << std::setw(8) << "dPhi" << "\t";
-        particle_file << std::setw(8) << "dTheta" << "\t";
-        particle_file << std::setw(7) << "S_child" << "\t";
-        particle_file << std::setw(8) << "ZpT" << "\t";
-        particle_file << std::setw(8) << "Hard_col" << "\t";
-        particle_file << std::setw(8) << "pTsum" << "\t";
-        particle_file << std::setw(8) << "pTsumTow" << "\t";
-        particle_file << std::setw(10) << "pTsumTrans" << "\t";
-        particle_file << std::setw(9) << "pTsumAway" << "\t";
-        particle_file << std::setw(13) << "pTsumTransmin" << "\t";
-        particle_file << std::setw(13) << "pTsumTransmax" << "\t";
-        particle_file << std::setw(9) << "dEta*dPhi" << "\t";
-        particle_file << std::setw(10) << "f_pTsumTow" << "\t";
-        particle_file << std::setw(12) << "f_pTsumTrans" << "\t";
-        particle_file << std::setw(11) << "f_pTsumAway" << "\t";
-        particle_file << std::setw(15) << "f_pTsumTransmin" << "\t";
-        particle_file << std::setw(15) << "f_pTsumTransmax" << '\n';
+        particle_file << std::setw(8) << std::fixed << "dEta" << "\t";
+        particle_file << std::setw(8) << std::fixed << "dPhi" << "\t";
+        particle_file << std::setw(7) << std::fixed << "S_child" << "\t";
+        particle_file << std::setw(9) << std::fixed << "ZpT" << "\t";
+        particle_file << std::setw(8) << std::fixed << "Z_eta" << "\t";
+        particle_file << std::setw(8) << std::fixed << "Hard_col" << "\t";
+        particle_file << std::setw(8) << std::fixed << "pTsum" << "\t";
+        particle_file << std::setw(8) << std::fixed << "pTsumTow" << "\t";
+        particle_file << std::setw(10) << std::fixed << "pTsumTrans" << "\t";
+        particle_file << std::setw(9) << std::fixed << "pTsumAway" << "\t";
+        particle_file << std::setw(13) << std::fixed << "pTsumTransmin" << "\t";
+        particle_file << std::setw(13) << std::fixed << "pTsumTransmax" << "\t";
+        particle_file << std::setw(9) << std::fixed << "dEta*dPhi" << "\t";
+        particle_file << std::setw(10) << std::fixed << "f_pTsumTow" << "\t";
+        particle_file << std::setw(12) << std::fixed << "f_pTsumTrans" << "\t";
+        particle_file << std::setw(11) << std::fixed << "f_pTsumAway" << "\t";
+        particle_file << std::setw(15) << std::fixed << "f_pTsumTransmin" << "\t";
+        particle_file << std::setw(15) << std::fixed << "f_pTsumTransmax" << '\n';
         
-        int h_length = 8 + 8 + 8 + 7 + 8 + 8 + 8 + 8 + 10 + 9 + 13 + 13 + 9 + 10 + 12 + 11 + 15 + 15;
-        
-        classify_particles(event, particle_file, area, Zphi, Zeta, Zpt, Zthe, h_length);
+        classify_particles(event, particle_file, area, Zphi, Zeta, Zpt);
         
         particle_file.close();
         
