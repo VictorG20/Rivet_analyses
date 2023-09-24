@@ -136,6 +136,8 @@ public:
             
         }
         
+        if (deta_values.size() == 0) return;
+        
         for (int i = 0; i < deta_values.size() - 1; i++){
             outfile << std::setprecision(4);
             outfile << std::setw(8) << std::fixed << deta_values[i] << "\t";
@@ -159,7 +161,7 @@ public:
             outfile << std::setw(9) << std::fixed << area << "\t";
             
             analyze_final_state(event, outfile, area, Zphi, Zpt);
-//            outfile << std::setw(9) << to_string(area) << '\n';
+
         }
         
     }
